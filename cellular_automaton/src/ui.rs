@@ -1,0 +1,123 @@
+use std::time::{Duration, Instant};
+
+use eframe::egui;
+
+use crate::{automata, engine::Engine};
+
+pub struct App {
+    engine: Engine,
+    running: bool,
+    step_ms: u64,
+    selected: String,
+
+    last_frame: Instant, // temps du dernier update
+    acc: Duration,       // accumulateur de temps
+}
+
+impl App {
+    pub fn new() -> Self {
+        let default = "life";
+        let automaton = automata::by_name(default).unwrap_or_else(|| automata::available().remove(0));
+        Self {
+            engine: Engine::new(80, 45, automaton),
+            running: true,
+            step_ms: 80,
+            selected: default.to_string(),
+
+            last_frame: Instant::now(),
+            acc: Duration::ZERO,
+        }
+    }
+}
+
+impl eframe::App for App {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // --- barre de contrôle
+        egui::TopBottomPanel::top("top").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button(if self.running { "Pause" } else { "Run" }).clicked() {
+                    self.running = !self.running;
+                    self.last_frame = Instant::now();
+                    self.acc = Duration::ZERO;
+                }
+                if ui.button("Step").clicked() {
+                    self.engine.step_once();
+                    self.last_frame = Instant::now();
+                    self.acc = Duration::ZERO;
+                }
+
+                ui.add(egui::Slider::new(&mut self.step_ms, 1..=500).text("ms/step"));
+
+                egui::ComboBox::from_label("Automate")
+                    .selected_text(&self.selected)
+                    .show_ui(ui, |ui| {
+                        for a in automata::available() {
+                            let name = a.name().to_string();
+                            if ui.selectable_label(self.selected == name, &name).clicked() {
+                                self.selected = name.clone();
+                                self.engine.set_automaton(a);
+                                self.last_frame = Instant::now();
+                                self.acc = Duration::ZERO;
+                            }
+                        }
+                    });
+            });
+        });
+
+        // --- rendu (rectangles)
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let g = self.engine.current();
+            let avail = ui.available_size();
+            let cell_w = (avail.x / g.width() as f32).floor().max(1.0);
+            let cell_h = (avail.y / g.height() as f32).floor().max(1.0);
+            let cell = cell_w.min(cell_h);
+
+            let (rect, _resp) = ui.allocate_exact_size(
+                egui::vec2(cell * g.width() as f32, cell * g.height() as f32),
+                egui::Sense::hover(),
+            );
+            let painter = ui.painter_at(rect);
+
+            for y in 0..g.height() {
+                for x in 0..g.width() {
+                    if g.get(x, y) != 0 {
+                        let min = rect.min + egui::vec2(x as f32 * cell, y as f32 * cell);
+                        let r = egui::Rect::from_min_size(min, egui::vec2(cell, cell));
+                        painter.rect_filled(r, 0.0, egui::Color32::WHITE);
+                    }
+                }
+            }
+        });
+
+        // --- simulateur stable (accumulateur)
+        let now = Instant::now();
+        let dt = now.duration_since(self.last_frame);
+        self.last_frame = now;
+
+        if self.running {
+            let step = Duration::from_millis(self.step_ms);
+            self.acc += dt;
+
+            // cap: évite de passer 2s à rattraper si l'UI freeze
+            const MAX_STEPS_PER_FRAME: usize = 8;
+
+            let mut nsteps = 0usize;
+            while self.acc >= step && nsteps < MAX_STEPS_PER_FRAME {
+                self.engine.step_once();
+                self.acc -= step;
+                nsteps += 1;
+            }
+
+            // si on est trop en retard, on drop l'excès
+            if nsteps == MAX_STEPS_PER_FRAME {
+                self.acc = Duration::ZERO;
+            }
+
+            // repaint asap, l'update est déjà régulé par l'accu
+            ctx.request_repaint();
+        } else {
+            // en pause, on n'a pas besoin de repaints continus
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
+    }
+}
