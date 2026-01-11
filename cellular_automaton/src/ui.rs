@@ -1,8 +1,18 @@
 use std::time::{Duration, Instant};
-
 use eframe::egui;
-
 use crate::{automata, engine::Engine};
+
+const PALETTE: [egui::Color32; 8] = [
+    egui::Color32::BLACK,       // 0
+    egui::Color32::WHITE,       // 1
+    egui::Color32::DARK_BLUE,   // 2
+    egui::Color32::PURPLE,      // 3
+    egui::Color32::GREEN,       // 4
+    egui::Color32::DARK_GREEN,  // 5
+    egui::Color32::RED,         // 6
+    egui::Color32::GOLD,         // 7
+];
+
 
 pub struct App {
     engine: Engine,
@@ -22,7 +32,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let default = "life";
+        let default = "mazesolver";
         let automaton = automata::by_name(default).unwrap_or_else(|| automata::available().remove(0));
         let grids = crate::io::bin::list_grids().unwrap_or_default();
         let selected_grid = grids.get(0).cloned().unwrap_or_default();
@@ -30,7 +40,7 @@ impl App {
         Self {
             engine: Engine::new(80, 45, automaton),
             running: true,
-            step_ms: 80,
+            step_ms: 300,
             selected: default.to_string(),
 
             last_frame: Instant::now(),
@@ -160,11 +170,14 @@ impl eframe::App for App {
 
             for y in 0..g.height() {
                 for x in 0..g.width() {
-                    if g.get(x, y) != 0 {
-                        let min = rect.min + egui::vec2(x as f32 * cell, y as f32 * cell);
-                        let r = egui::Rect::from_min_size(min, egui::vec2(cell, cell));
-                        painter.rect_filled(r, 0.0, egui::Color32::WHITE);
-                    }
+                    let v = g.get(x, y) as usize;
+                    if v == 0 { continue; }
+
+                    let color = PALETTE.get(v).copied().unwrap_or(egui::Color32::GRAY);
+
+                    let min = rect.min + egui::vec2(x as f32 * cell, y as f32 * cell);
+                    let r = egui::Rect::from_min_size(min, egui::vec2(cell, cell));
+                    painter.rect_filled(r, 0.0, color);
                 }
             }
         });

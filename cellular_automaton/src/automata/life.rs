@@ -25,6 +25,7 @@ impl Life {
         n += (cur.get(xm1, yp1) != 0) as u8;
         n += (cur.get(x,   yp1) != 0) as u8;
         n += (cur.get(xp1, yp1) != 0) as u8;
+        
         n
     }
 }
