@@ -28,4 +28,9 @@ impl Engine {
         self.automaton.step(&self.current, &mut self.next);
         self.current.swap(&mut self.next);
     }
+
+    pub fn set_grid(&mut self, grid: Grid) {
+        self.current = grid;
+        self.next = Grid::new(self.current.width(), self.current.height());
+    }
 }

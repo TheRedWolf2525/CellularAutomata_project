@@ -42,4 +42,16 @@ impl Grid {
     pub fn swap(&mut self, other: &mut Grid) {
         std::mem::swap(&mut self.cells, &mut other.cells);
     }
+
+    pub fn cell_count(&self) -> usize { 
+        self.w * self.h 
+    }
+    
+    pub fn as_slice(&self) -> &[u8] { 
+        &self.cells 
+    }
+    
+    pub fn as_mut_slice(&mut self) -> &mut [u8] { 
+        &mut self.cells 
+    }
 }

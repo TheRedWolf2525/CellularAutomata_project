@@ -10,14 +10,23 @@ pub struct App {
     step_ms: u64,
     selected: String,
 
-    last_frame: Instant, // temps du dernier update
-    acc: Duration,       // accumulateur de temps
+    // time sync
+    last_frame: Instant,
+    acc: Duration,
+
+    save_name: String,
+    status: String,
+    grids: Vec<String>,
+    selected_grid: String, 
 }
 
 impl App {
     pub fn new() -> Self {
         let default = "life";
         let automaton = automata::by_name(default).unwrap_or_else(|| automata::available().remove(0));
+        let grids = crate::io::bin::list_grids().unwrap_or_default();
+        let selected_grid = grids.get(0).cloned().unwrap_or_default();
+        
         Self {
             engine: Engine::new(80, 45, automaton),
             running: true,
@@ -26,6 +35,11 @@ impl App {
 
             last_frame: Instant::now(),
             acc: Duration::ZERO,
+
+            save_name: "grid1".to_string(),
+            status: String::new(),
+            grids,
+            selected_grid,
         }
     }
 }
@@ -35,17 +49,22 @@ impl eframe::App for App {
         // --- barre de contrôle
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.horizontal(|ui| {
+                
+                // Pause button
                 if ui.button(if self.running { "Pause" } else { "Run" }).clicked() {
                     self.running = !self.running;
                     self.last_frame = Instant::now();
                     self.acc = Duration::ZERO;
                 }
+
+                // Step button
                 if ui.button("Step").clicked() {
                     self.engine.step_once();
                     self.last_frame = Instant::now();
                     self.acc = Duration::ZERO;
                 }
-
+                
+                // Speed slider
                 ui.add(egui::Slider::new(&mut self.step_ms, 1..=500).text("ms/step"));
 
                 egui::ComboBox::from_label("Automate")
@@ -62,9 +81,70 @@ impl eframe::App for App {
                         }
                     });
             });
+
+            ui.horizontal(|ui| {
+                // Save/Load
+                ui.label("Save:");
+                ui.text_edit_singleline(&mut self.save_name);
+
+                if ui.button("Save").clicked() {
+                    let mut file = self.save_name.trim().to_string();
+                    if file.is_empty() {
+                        self.status = "Nom vide".to_string();
+                    } else {
+                        if !file.ends_with(".cagr") {
+                            file.push_str(".cagr");
+                        }
+                        let path = crate::io::bin::path_in_dir(&file);
+                        match crate::io::bin::save(&path, self.engine.current()) {
+                            Ok(()) => {
+                                self.status = format!("Saved: {:?}", path);
+                                self.grids = crate::io::bin::list_grids().unwrap_or_default();
+                                self.selected_grid = file;
+                            }
+                            Err(e) => self.status = format!("Save error: {e:?}"),
+                        }
+                    }
+                }
+
+                if ui.button("Refresh").clicked() {
+                    self.grids = crate::io::bin::list_grids().unwrap_or_default();
+                    if self.selected_grid.is_empty() {
+                        self.selected_grid = self.grids.get(0).cloned().unwrap_or_default();
+                    }
+                }
+
+                egui::ComboBox::from_id_salt("grid_load_combo")
+                    .selected_text(if self.selected_grid.is_empty() { "(none)" } else { &self.selected_grid })
+                    .show_ui(ui, |ui| {
+                        for name in &self.grids {
+                            ui.selectable_value(&mut self.selected_grid, name.clone(), name);
+                        }
+                    });
+
+                if ui.button("Load").clicked() {
+                    if self.selected_grid.is_empty() {
+                        self.status = "Aucune grille".to_string();
+                    } else {
+                        let path = crate::io::bin::path_in_dir(&self.selected_grid);
+                        match crate::io::bin::load(&path) {
+                            Ok(g) => {
+                                self.engine.set_grid(g);
+                                self.status = format!("Loaded: {:?}", path);
+                            }
+                            Err(e) => self.status = format!("Load error: {e:?} (path={:?})", path),
+                        }
+                    }
+                }
+
+                if !self.status.is_empty() {
+                    ui.label(&self.status);
+                }
+
+            });
         });
 
-        // --- rendu (rectangles)
+        // rendu 
         egui::CentralPanel::default().show(ctx, |ui| {
             let g = self.engine.current();
             let avail = ui.available_size();
