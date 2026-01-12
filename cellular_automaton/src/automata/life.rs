@@ -1,4 +1,5 @@
 use crate::{automaton::Automaton, grid::Grid};
+use rand::{Rng, rng};
 
 pub struct Life;
 
@@ -36,28 +37,60 @@ impl Automaton for Life {
     fn init(&self, grid: &mut Grid) {
         grid.fill(0);
 
-        // un "glider" simple pour tester
+        /* 
+        // Glider
         let (x, y) = (2, 2);
         grid.set(x + 1, y, 1);
         grid.set(x + 2, y + 1, 1);
         grid.set(x,     y + 2, 1);
         grid.set(x + 1, y + 2, 1);
         grid.set(x + 2, y + 2, 1);
+        */
+
+        for y in 0..grid.height() {
+            for x in 0..grid.width() {
+                if rng().random::<f32>() < 0.5 {
+                    grid.set(x, y, 1);
+                }
+            }
+        }
     }
 
-    fn step(&self, current: &Grid, next: &mut Grid) {
-        for y in 0..current.height() {
-            for x in 0..current.width() {
-                let alive = current.get(x, y) != 0;
-                let n = Self::count_neighbors(current, x, y);
+    fn soft_init(&self, _grid: &mut Grid) {}
 
-                let out_alive = match (alive, n) {
-                    (true, 2) | (true, 3) => true,
-                    (false, 3) => true,
-                    _ => false,
-                };
+    fn step(&self, current: &Grid, next: &mut Grid, async_fact: f32) {
+        if async_fact == 0.0 {
+            let x = rng().random_range(..current.width());
+            let y = rng().random_range(..current.height());
 
-                next.set(x, y, if out_alive { 1 } else { 0 });
+            let alive = current.get(x, y) != 0;
+            let n = Self::count_neighbors(current, x, y);
+
+            let out_alive = match (alive, n) {
+                (true, 2) | (true, 3) => true,
+                (false, 3) => true,
+                _ => false,
+            };
+
+            next.set(x, y, if out_alive { 1 } else { 0 });
+        } else {
+            for y in 0..current.height() {
+                for x in 0..current.width() {
+                    if rng().random::<f32>() < async_fact {
+                        let alive = current.get(x, y) != 0;
+                        let n = Self::count_neighbors(current, x, y);
+        
+                        let out_alive = match (alive, n) {
+                            (true, 2) | (true, 3) => true,
+                            (false, 3) => true,
+                            _ => false,
+                        };
+        
+                        next.set(x, y, if out_alive { 1 } else { 0 });
+                    } else {
+                        next.set(x, y, current.get(x, y));
+                    }
+                }
             }
         }
     }

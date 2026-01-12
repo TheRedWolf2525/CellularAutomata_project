@@ -16,7 +16,9 @@ impl Automaton for Dummy {
         }
     }
 
-    fn step(&self, current: &Grid, next: &mut Grid) {
+    fn soft_init(&self, _grid: &mut Grid) {}
+
+    fn step(&self, current: &Grid, next: &mut Grid, async_fact: f32) {
         // exemple simple: inversion 0<->1
         for y in 0..current.height() {
             for x in 0..current.width() {

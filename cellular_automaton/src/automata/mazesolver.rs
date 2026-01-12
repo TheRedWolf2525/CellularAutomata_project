@@ -73,12 +73,18 @@ impl Automaton for MazeSolver{
             grid.set(w - 1, y, 1);
         }
 
+        self.soft_init(grid);
+    }
+
+    fn soft_init(&self, grid: &mut Grid) {
+        let w = grid.width();
+        let h = grid.height();
+
         grid.set(1, 1, 2);
         grid.set(w-10, h-10, 3);
     }
 
-
-    fn step(&self, current: &Grid, next: &mut Grid) {        
+    fn step(&self, current: &Grid, next: &mut Grid, async_fact: f32) {        
         for y in 0..current.height() {
             for x in 0..current.width() {
                 let v = current.get(x, y);

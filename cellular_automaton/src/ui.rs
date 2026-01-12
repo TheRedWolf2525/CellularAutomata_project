@@ -18,6 +18,7 @@ pub struct App {
     engine: Engine,
     running: bool,
     step_ms: u64,
+    async_fact: f32,
     selected: String,
 
     // time sync
@@ -38,8 +39,9 @@ impl App {
         let selected_grid = grids.get(0).cloned().unwrap_or_default();
         
         Self {
-            engine: Engine::new(80, 45, automaton),
-            running: true,
+            async_fact: 1.0,
+            engine: Engine::new(80, 45, 1.0, automaton),
+            running: false,
             step_ms: 300,
             selected: default.to_string(),
 
@@ -76,8 +78,16 @@ impl eframe::App for App {
                 
                 // Speed slider
                 ui.add(egui::Slider::new(&mut self.step_ms, 1..=500).text("ms/step"));
+                ui.separator();
 
-                egui::ComboBox::from_label("Automate")
+                // Async slider
+                ui.label("Asynchronism");
+                ui.add(egui::Slider::new(&mut self.async_fact, 0.0..=1.0).text("%"));
+                self.engine.set_async_fact(self.async_fact);
+                ui.separator();
+
+                // Selection automate
+                egui::ComboBox::from_label("Automaton")
                     .selected_text(&self.selected)
                     .show_ui(ui, |ui| {
                         for a in automata::available() {
@@ -140,6 +150,7 @@ impl eframe::App for App {
                         match crate::io::bin::load(&path) {
                             Ok(g) => {
                                 self.engine.set_grid(g);
+                                self.engine.soft_init();
                                 self.status = format!("Loaded: {:?}", path);
                             }
                             Err(e) => self.status = format!("Load error: {e:?} (path={:?})", path),

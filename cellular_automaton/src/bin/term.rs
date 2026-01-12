@@ -23,7 +23,7 @@ fn main() {
         std::process::exit(2);
     });
 
-    let mut engine = Engine::new(40, 20, automaton);
+    let mut engine = Engine::new(40, 20, 1.0, automaton);
     let mut renderer = TerminalRenderer::new();
 
     loop {
