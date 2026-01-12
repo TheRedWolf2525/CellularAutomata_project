@@ -1,6 +1,8 @@
 pub mod dummy;
 pub mod life;
 pub mod mazesolver;
+pub mod patterns;
+
 
 use crate::automaton::Automaton;
 

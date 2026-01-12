@@ -1,4 +1,4 @@
-use crate::{automaton::Automaton, grid::Grid};
+use crate::{automaton::Automaton, grid::Grid, automata::patterns::ALL_PATTERNS};
 
 pub struct MazeSolver;
 
@@ -15,7 +15,7 @@ pub struct MazeSolver;
 
 impl MazeSolver {
     #[inline]
-    fn get_neighbors(cur: &Grid, x: usize, y: usize) -> Vec<u8> {
+    fn get_4neigh_count(cur: &Grid, x: usize, y: usize) -> [u8; 8] {
         let w = cur.width();
         let h = cur.height();
 
@@ -25,12 +25,16 @@ impl MazeSolver {
         let ym1 = if y == 0 { h - 1 } else { y - 1 };
         let yp1 = if y + 1 == h { 0 } else { y + 1 };
 
-        let mut l = vec![0;4];
-        l[0] = (cur.get(x,   ym1) != 0) as u8;
-        l[1] = (cur.get(xm1, y) != 0) as u8;
-        l[2] = (cur.get(xp1, y) != 0) as u8;
-        l[3] = (cur.get(x,   yp1) != 0) as u8;
-                
+        let mut l = [0u8; 8];
+        let n = cur.get(x,   ym1) as usize;
+        l[n] += 1;
+        let n = cur.get(xm1, y) as usize;
+        l[n] += 1;
+        let n = cur.get(xp1, y) as usize;
+        l[n] += 1;
+        let n = cur.get(x,   yp1) as usize;
+        l[n] += 1;
+        
         l
     }
 
@@ -52,6 +56,62 @@ impl MazeSolver {
                 
         false
     }
+
+    #[inline]
+    fn match_pattern(cur: &Grid, x: usize, y: usize, pat: &[[i8; 5]; 5]) -> bool {
+        let w = cur.width() as i32;
+        let h = cur.height() as i32;
+        let cx = x as i32;
+        let cy = y as i32;
+
+        #[inline]
+        fn wrap(a: i32, m: i32) -> usize {
+            a.rem_euclid(m) as usize
+        }
+
+        // 8 symétries du carré (D4) sur les indices (i,j) du pattern 5x5
+        // On parcourt la fenêtre 5x5 dans la grille, et on compare à pat[pj][pi].
+        for t in 0..8u8 {
+            let mut ok = true;
+
+            for j in 0..5usize {
+                for i in 0..5usize {
+                    // Coord grille de la case (i,j) de la fenêtre (wrap)
+                    let gx = wrap(cx + (i as i32 - 2), w);
+                    let gy = wrap(cy + (j as i32 - 2), h);
+
+                    // Indices dans le pattern après transformation
+                    let (pi, pj) = match t {
+                        0 => (i, j),               // identité
+                        1 => (4 - j, i),           // rot 90
+                        2 => (4 - i, 4 - j),       // rot 180
+                        3 => (j, 4 - i),           // rot 270
+                        4 => (4 - i, j),           // miroir vertical
+                        5 => (4 - j, 4 - i),       // miroir vertical + rot 90
+                        6 => (i, 4 - j),           // miroir vertical + rot 180 (miroir horizontal)
+                        _ => (j, i),               // miroir vertical + rot 270 (miroir diag)
+                    };
+
+                    let want = pat[pj][pi];
+                    if want == -1 {
+                        continue; // wildcard
+                    }
+
+                    if cur.get(gx, gy) != want as u8 {
+                        ok = false;
+                        break;
+                    }
+                }
+                if !ok { break; }
+            }
+
+            if ok {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 impl Automaton for MazeSolver{
@@ -66,6 +126,8 @@ impl Automaton for MazeSolver{
         for x in 0..w {
             grid.set(x, 0, 1);
             grid.set(x, h - 1, 1);
+            if x < 60 {grid.set(x, 15, 1);}
+            if x > 30 {grid.set(x, 25, 1);}
         }
 
         for y in 0..h {
@@ -84,7 +146,7 @@ impl Automaton for MazeSolver{
         grid.set(w-10, h-10, 3);
     }
 
-    fn step(&self, current: &Grid, next: &mut Grid, async_fact: f32) {        
+    fn step(&self, current: &Grid, next: &mut Grid, _async_fact: f32) {        
         for y in 0..current.height() {
             for x in 0..current.width() {
                 let v = current.get(x, y);
@@ -92,16 +154,25 @@ impl Automaton for MazeSolver{
 
                 // Exploration
                 if v == 0 && (Self::in_neighbors(current, x, y, 2) || Self::in_neighbors(current, x, y, 4)) {next.set(x, y, 4);}
-                if v == 4 && !Self::in_neighbors(current, x, y, 0) {next.set(x, y, 5);}
+                if v == 4 {next.set(x, y, 5);}
 
                 if v == 4 && Self::in_neighbors(current, x, y, 3) {next.set(x, y, 7);}
 
                 // Backtracking
                 if v == 5 && Self::in_neighbors(current, x, y, 7) {next.set(x, y, 7);}
-                if v == 5 && !Self::in_neighbors(current, x, y, 7) && (Self::in_neighbors(current, x, y, 6) || Self::in_neighbors(current, x, y, 0)) {next.set(x, y, 7);}
-
+                
                 // Suppression
-                if (v == 4 || v == 5) && Self::in_neighbors(current, x, y, 6) {next.set(x, y, 6);}
+                let l = Self::get_4neigh_count(current, x, y);
+                if v == 7 {
+                    if (l[1]+l[0])>=3 {next.set(x, y, 6);}
+                    if (l[1]+l[0])>=2 && l[6]>=1 {next.set(x, y, 6);}
+                    for pat in ALL_PATTERNS {
+                        if Self::match_pattern(current, x, y, pat){
+                            next.set(x, y, 6);
+                            break;
+                        }
+                    }
+                }
                 if v == 6 {next.set(x, y, 0);}
             }
         }
