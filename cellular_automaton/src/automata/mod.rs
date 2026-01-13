@@ -2,6 +2,7 @@ pub mod dummy;
 pub mod life;
 pub mod mazesolver;
 pub mod patterns;
+pub mod mazegenerator;
 
 
 use crate::automaton::Automaton;
@@ -11,6 +12,7 @@ pub fn available() -> Vec<Box<dyn Automaton>> {
         Box::new(dummy::Dummy),
         Box::new(life::Life),
         Box::new(mazesolver::MazeSolver),
+        Box::new(mazegenerator::MazeGenerator::new()),
     ]
 }
 

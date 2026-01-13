@@ -144,7 +144,7 @@ impl Automaton for MazeSolver{
         let h = grid.height();
 
         grid.set(1, 1, 2);
-        grid.set(w-10, h-10, 3);
+        grid.set(w-9, h-10, 3);
     }
 
     fn step(&self, current: &Grid, next: &mut Grid, async_fact: f32) {        
