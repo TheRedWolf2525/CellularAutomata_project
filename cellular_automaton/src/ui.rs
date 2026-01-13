@@ -81,7 +81,7 @@ impl eframe::App for App {
                 ui.separator();
 
                 // Async slider
-                ui.label("Asynchronism");
+                ui.label("Synchronism");
                 ui.add(egui::Slider::new(&mut self.async_fact, 0.0..=1.0).text("%"));
                 self.engine.set_async_fact(self.async_fact);
                 ui.separator();

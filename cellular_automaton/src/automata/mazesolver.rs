@@ -1,4 +1,5 @@
 use crate::{automaton::Automaton, grid::Grid, automata::patterns::ALL_PATTERNS};
+use rand::{Rng, rng};
 
 pub struct MazeSolver;
 
@@ -146,34 +147,69 @@ impl Automaton for MazeSolver{
         grid.set(w-10, h-10, 3);
     }
 
-    fn step(&self, current: &Grid, next: &mut Grid, _async_fact: f32) {        
-        for y in 0..current.height() {
-            for x in 0..current.width() {
-                let v = current.get(x, y);
-                next.set(x, y, v); // par défaut même valeur
+    fn step(&self, current: &Grid, next: &mut Grid, async_fact: f32) {        
+        if async_fact == 0.0 {
+            let x = rng().random_range(..current.width());
+            let y = rng().random_range(..current.height());
 
-                // Exploration
-                if v == 0 && (Self::in_neighbors(current, x, y, 2) || Self::in_neighbors(current, x, y, 4)) {next.set(x, y, 4);}
-                if v == 4 {next.set(x, y, 5);}
+            let v = current.get(x, y);
+            next.set(x, y, v); // par défaut même valeur
 
-                if v == 4 && Self::in_neighbors(current, x, y, 3) {next.set(x, y, 7);}
+            // Exploration
+            if v == 0 && (Self::in_neighbors(current, x, y, 2) || Self::in_neighbors(current, x, y, 4)) {next.set(x, y, 4);}
+            if v == 4 {next.set(x, y, 5);}
 
-                // Backtracking
-                if v == 5 && Self::in_neighbors(current, x, y, 7) {next.set(x, y, 7);}
-                
-                // Suppression
-                let l = Self::get_4neigh_count(current, x, y);
-                if v == 7 {
-                    if (l[1]+l[0])>=3 {next.set(x, y, 6);}
-                    if (l[1]+l[0])>=2 && l[6]>=1 {next.set(x, y, 6);}
-                    for pat in ALL_PATTERNS {
-                        if Self::match_pattern(current, x, y, pat){
-                            next.set(x, y, 6);
-                            break;
-                        }
+            if v == 4 && Self::in_neighbors(current, x, y, 3) {next.set(x, y, 7);}
+
+            // Backtracking
+            if v == 5 && Self::in_neighbors(current, x, y, 7) {next.set(x, y, 7);}
+            
+            // Suppression
+            let l = Self::get_4neigh_count(current, x, y);
+            if v == 7 {
+                if (l[1]+l[0])>=3 {next.set(x, y, 6);}
+                if (l[1]+l[0])>=2 && l[6]>=1 {next.set(x, y, 6);}
+                for pat in ALL_PATTERNS {
+                    if Self::match_pattern(current, x, y, pat){
+                        next.set(x, y, 6);
+                        break;
                     }
                 }
-                if v == 6 {next.set(x, y, 0);}
+            }
+            if v == 6 {next.set(x, y, 0);}
+        } else {
+            for y in 0..current.height() {
+                for x in 0..current.width() {
+                    if rng().random::<f32>() < async_fact {
+                        let v = current.get(x, y);
+                        next.set(x, y, v); // par défaut même valeur
+        
+                        // Exploration
+                        if v == 0 && (Self::in_neighbors(current, x, y, 2) || Self::in_neighbors(current, x, y, 4)) {next.set(x, y, 4);}
+                        if v == 4 {next.set(x, y, 5);}
+        
+                        if v == 4 && Self::in_neighbors(current, x, y, 3) {next.set(x, y, 7);}
+        
+                        // Backtracking
+                        if v == 5 && Self::in_neighbors(current, x, y, 7) {next.set(x, y, 7);}
+                        
+                        // Suppression
+                        let l = Self::get_4neigh_count(current, x, y);
+                        if v == 7 {
+                            if (l[1]+l[0])>=3 {next.set(x, y, 6);}
+                            if (l[1]+l[0])>=2 && l[6]>=1 {next.set(x, y, 6);}
+                            for pat in ALL_PATTERNS {
+                                if Self::match_pattern(current, x, y, pat){
+                                    next.set(x, y, 6);
+                                    break;
+                                }
+                            }
+                        }
+                        if v == 6 {next.set(x, y, 0);}
+                    } else {
+                        next.set(x, y, current.get(x, y));
+                    }
+                }
             }
         }
     }
